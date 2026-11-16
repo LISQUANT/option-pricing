@@ -1,20 +1,35 @@
-
-
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov 11 16:56:53 2026
+Created on Sun Nov 15 18:01:29 2026
 
 @author: HP
 """
 
+#~~~~~~~~~~~~~~~~~~ LEGEND ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+
+Calls:
+    
+EC_MC -> European Call, priced with Monte Carlo
+EC_T -> European Call, priced with Binomial tree
+EC_BS -> European Call, priced with Black-Scholes
+As_C_MC-> Asian Call, priced with Monte Carlo
+
+Puts_
+
+AP_T -> American put, priced with Binomial tree
+
+"""
+
 
 import numpy as np
-
 import matplotlib.pyplot as plt
 import math
 from scipy.stats import norm
 from scipy.stats import binom
 
+
+# ~~~~~~~~~~~~~~~~~~~~~ VARIABLES  ~~~~~~~~~~~~~~~~~~~~~~
 
 T=25
 r=0.03
@@ -29,12 +44,12 @@ dt=T/n
 
 N = norm.cdf
 
-def BS_CALL(S, K, T, r, sigma):
+def EC_BS(S, K, T, r, sigma):
     d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
     return S * N(d1) - K * np.exp(-r*T)* N(d2)
 
-BS= BS_CALL(St,K,T,r,vol)
+EC_BS(St,K,T,r,vol)
 
 #~~~~~~~~~~~~~~~~~~~  MONTE CARLO  ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -44,7 +59,7 @@ def stock_price(Sn,rng,dt_sim,r=r,vol=vol):
     Sn1=Sn*np.exp((r-(vol**2)/2)*dt_sim+(vol*np.sqrt(dt_sim)*rng.normal()))
     return Sn1
 
-def MC(n_sim,St,T,r=r,vol=vol,plot_paths= True,seed=None):
+def EC_MC(n_sim,St,K,T,r=r,vol=vol,plot_paths= True,seed=None):
     ST=[]
     rng = np.random.default_rng(seed) #important to compute greeks
     dt_sim=T/n
@@ -65,23 +80,26 @@ def MC(n_sim,St,T,r=r,vol=vol,plot_paths= True,seed=None):
     
     payoff=[max(x-K,0) for x in ST]
     Exp_Payoffs=[1/len(payoff)*x for x in payoff]
-    V0_MC=(np.exp(-r*T))*sum(Exp_Payoffs)
-    E_MC=BS-V0_MC 
-    return V0_MC,E_MC
+    V0_EC_MC=(np.exp(-r*T))*sum(Exp_Payoffs)
+    Er_EC_MC=EC_BS(St,K,T,r,vol,0)-V0_EC_MC 
+    return V0_EC_MC,Er_EC_MC
 
-MC(100,St,T,r,vol,1)
+EC_MC(100,St,K,T,r,vol,1)
 #~~~~~~~~~~~~~~~~~~~  BINOMIAL TREE  ~~~~~~~~~~~~~~~~~~~~~~
 
-k=0
-u=np.exp(vol*np.sqrt(dt))
-d=1/u
-p=(np.exp(r*dt)-d)/(u-d)
-
-exp_payoff=[max((St*u**k*d**(n-k))-K,0)*math.comb(n, k)*p**k*(1-p)**(n-k) for k in range(n+1)]
-print(exp_payoff)
-V0_BT=(np.exp(-r*T))*sum(exp_payoff)
-print(V0_BT)
-
+def EC_T(K,St,n,r,T):
+    k=0
+    u=np.exp(vol*np.sqrt(dt))
+    d=1/u
+    p=(np.exp(r*dt)-d)/(u-d)
+    
+    exp_payoff=[max((St*u**k*d**(n-k))-K,0)*math.comb(n, k)*p**k*(1-p)**(n-k) for k in range(n+1)]
+    #print(exp_payoff)
+    V0_BT=(np.exp(-r*T))*sum(exp_payoff)
+    print(V0_BT)
+    
+EC_T(K, St, n, r, T)    
+    
 # ~~~~~~~~~~~~~~~ TREE PRICE VS Nº OF STEPS ~~~~~~~~~~~~~~
 
 steps=[]
@@ -114,30 +132,30 @@ plt.ylabel('Price')
 
 
 
-# ~~~~~~ MONTE CARLO ERROR VS Nº OF SIMULATIONS ~~~~~~~
+# ~~~~~~~~~~~ MONTE CARLO ERROR VS Nº OF SIMULATIONS ~~~~~~~~~~~
 
 
 nº_sim=[]
-sims=10
+sims=100
 for i in range(1,sims+1):
     pace=1000*i
     nº_sim.append(pace)
 #print(nº_sim)
 
 
-MC_error=[]
+EC_MC_error=[]
 for sim in nº_sim:
-    price,error= MC(sim,St,T,0)
-    MC_error.append(error)
+    price,error= EC_MC(sim,St,K,T,r, vol,0)
+    EC_MC_error.append(error)
 #print(MC_error)
 
 plt.figure()
 plt.title('Monte Carlo Errors vs nº of Simulations')
-plt.plot(nº_sim,MC_error)
+plt.plot(nº_sim,EC_MC_error)
 plt.xlabel('nº of Simulations')
 plt.ylabel('Monte Carlo Errors')
 
-# ~~~~~~ GREEKS BY FINITE DIFFERENCES ~~~~~~~
+# ~~~~~~~~~~~~~~~~ GREEKS BY FINITE DIFFERENCES ~~~~~~~~~~~~~~~
 
 #Using Centered finite difference
 
@@ -149,24 +167,104 @@ sims_greeks=1000
 
 h=0.1
 
-delta=(MC(sims_greeks,Sj+h,T,r,vol,0,1)[0]-MC(sims_greeks,Sj-h,T,r,vol,0,1)[0])/(2*h)
+delta=(EC_MC(sims_greeks,Sj+h,K,T,r,vol,0,1)[0]-EC_MC(sims_greeks,Sj-h,T,r,vol,0,1)[0])/(2*h)
 print(delta)
 
-gamma=(MC(sims_greeks,Sj-h,T,r,vol,0,1)[0]-2*MC(sims_greeks,Sj,T,r,vol,0,1)[0]+MC(sims_greeks,Sj+h,T,r,vol,0,1)[0])/(h**2)
+gamma=(EC_MC(sims_greeks,Sj-h,K,T,r,vol,0,1)[0]-2*EC_MC(sims_greeks,Sj,K,T,r,vol,0,1)[0]+EC_MC(sims_greeks,Sj+h,K,T,r,vol,0,1)[0])/(h**2)
 print(gamma)
 
 'Theta'
 ht=0.1
-theta=-(MC(sims_greeks,Sj,T+ht,r,vol,0,1)[0]-MC(sims_greeks,Sj,T-ht,r,vol,1)[0])/(2*ht)
+theta=-(EC_MC(sims_greeks,Sj,K,T+ht,r,vol,0,1)[0]-EC_MC(sims_greeks,Sj,K,T-ht,r,vol,1)[0])/(2*ht)
 print(theta)
 
 'Vega'
 hv=0.01
-vega=(MC(sims_greeks,Sj,T,r,vol+hv,0,1)[0]-MC(sims_greeks,Sj,T,r,vol-hv,0,1)[0])/(2*hv)
+vega=(EC_MC(sims_greeks,Sj,K,T,r,vol+hv,0,1)[0]-EC_MC(sims_greeks,Sj,K,T,r,vol-hv,0,1)[0])/(2*hv)
 print(vega)
 
 'Rho'
 hr=0.01
-rho=(MC(sims_greeks,Sj,T,r+hr,vol,0,1)[0]-MC(sims_greeks,Sj,T,r-hr,vol,0,1)[0])/(2*hr)
+rho=(EC_MC(sims_greeks,Sj,K,T,r+hr,vol,0,1)[0]-EC_MC(sims_greeks,Sj,K,T,r-hr,vol,0,1)[0])/(2*hr)
 print(rho)
+
+# ~~~~~~~~~~~~~~~~~~ AMERICAN PUT VALUATION ~~~~~~~~~~~~~~~~~
+
+def AP_T(K,St,n,r,T):
+    
+    k=0
+    u=np.exp(vol*np.sqrt(dt))
+    d=1/u
+    p=(np.exp(r*dt)-d)/(u-d)
+    
+    put_values=[max((K- St*u**k*d**(n-k)),0) for k in range(n+1)]
+    
+    for i in range(n-1,-1,-1):
+        new_put_values=[]
+        for k in range(i+1):
+            St_node=St*u**k*d**(i-k)
+            exercise= max(K-St_node,0)
+            continuation= np.exp(-r*dt)*(p*put_values[k+1]+(1-p)*put_values[k])
+            '''if exercise>continuation:
+                print(f"Step {i}, Node {k}: Early exercise optimal (St={St_node})")'''
+            new_value=max(exercise,continuation)
+            new_put_values.append(new_value)
+        put_values=new_put_values
+    
+    return(put_values[0])
+
+    
+AP_T(K, St, n, r, T)
+
+#CHECK -> American put> European put?
+
+# 1st -> Pricing European Put with Black-Scholes
+
+N = norm.cdf
+
+def EP_BS(S, K, T, r, sigma):
+    d1 = (np.log(S/K) + (r + sigma**2/2)*T) / (sigma*np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    return K * np.exp(-r*T)* N(-d2)- S * N(-d1)
+
+EP_BS(St,K,T,r,vol)
+
+#2nd -> Compare values
+
+if EC_BS(St,K,T,r,vol) > AP_T(K, St, n, r, T):
+    print('American Put is not well defined!')
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~ ASIAN OPTION ~~~~~~~~~~~~~~~~
+
+
+
+def AsC_MC(n_sim,St,K,T,r=r,vol=vol,plot_paths= True,seed=None):
+    t=np.linspace(0,T,n+1)
+    ST_avg=[]
+    rng = np.random.default_rng(seed) #important to compute greeks
+    dt_sim=T/n
+    if plot_paths==True:
+        plt.figure()
+    for sim in range(n_sim):    #nº of sim must increase when n increases 
+        Sn=St
+        path=[Sn]
+        for i in range(n):
+            Sn=stock_price(Sn,rng,dt_sim,r,vol)
+            path.append(Sn)
+        St_path_avg=sum(path)/len(path)
+        ST_avg.append(St_path_avg)
+        if plot_paths==True:
+            plt.plot(t,path) 
+            plt.title('Monte Carlo Simulation')
+            plt.xlabel('Time')
+            plt.ylabel('St')  
+    #print(ST_avg)      
+        
+    
+    payoff=[max(x-K,0) for x in ST_avg]
+    Exp_Payoffs=[1/len(payoff)*x for x in payoff]
+    V0_AsC_MC=(np.exp(-r*T))*sum(Exp_Payoffs)
+    return V0_AsC_MC
+
+AsC_MC(100,St,K,T,r,vol,1)
 

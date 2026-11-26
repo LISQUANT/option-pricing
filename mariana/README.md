@@ -1,3 +1,3 @@
-Migrate the code from the first project into your folder and continue development. 
+Run the code sequentially, section by section, so the graphs plot accurately.
 
-The final readme should include an overview of how to run your code, how you decided to structure and implement your code and the main things you learned whilst doing the project. 
+There's a tiny legend of which function prices so you don't get lost with the acronyms.
